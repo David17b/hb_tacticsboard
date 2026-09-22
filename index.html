@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Taktiktafel Handball</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --wood-1:#cdeaf7;
+    --wood-2:#b9e0f2;
+    --wood-3:#a6d5ec;
+    --line-white:#f7f3e9;
+    --team-a:#c8392f;
+    --team-a-dark:#8f2620;
+    --team-b:#e0b420;
+    --team-b-dark:#a17e0f;
+    --ink:#2b2118;
+    --paper:#f3ead2;
+    --paper-dark:#e6d9b4;
+    --accent:#e8a33d;
+    --ring:#ffd35c;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:#3a2c1c;font-family:'Oswald',system-ui,sans-serif;color:var(--ink);}
+
+  .app{
+    min-height:100%;
+    display:flex;
+    flex-direction:column;
+  }
+
+  header{
+    padding:14px 22px 10px;
+    background:linear-gradient(180deg,#2a2016,#3a2c1c);
+    border-bottom:3px solid #1c140c;
+    display:flex;
+    align-items:baseline;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  header h1{
+    margin:0;
+    font-size:1.5rem;
+    letter-spacing:.04em;
+    color:var(--line-white);
+    text-transform:uppercase;
+    font-weight:700;
+  }
+  header .sub{
+    color:#c9b489;
+    font-size:.85rem;
+    letter-spacing:.03em;
+  }
+
+  main{
+    flex:1;
+    display:flex;
+    gap:18px;
+    padding:18px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+
+  /* ---------- Court ---------- */
+  #court-outer{
+    flex:1 1 640px;
+    max-width:1000px;
+    min-width:300px;
+  }
+  #court-wrap{
+    position:relative;
+    width:100%;
+    aspect-ratio: 5 / 4;
+    max-width:700px;
+    margin:0 auto;
+    border-radius:6px;
+    overflow:hidden;
+    box-shadow:0 10px 30px rgba(0,0,0,.5), inset 0 0 0 6px #1c140c;
+    background:
+      repeating-linear-gradient(90deg, var(--wood-1) 0 26px, var(--wood-2) 26px 52px),
+      linear-gradient(180deg, var(--wood-1), var(--wood-3));
+    cursor:grab;
+    touch-action:none;
+  }
+  #court-wrap.drawing{cursor:crosshair;}
+  #court-svg{position:absolute;inset:0;width:100%;height:100%;display:block;}
+  #players-layer{position:absolute;inset:0;}
+  #players-layer.locked{pointer-events:none;}
+
+  .court-fill{fill:#c3e6f5;}
+  .goal-tint-a{fill:#9fdcf0;}
+  .goal-tint-b{fill:#9fdcf0;}
+  .line{stroke:var(--line-white);fill:none;stroke-width:3;stroke-linecap:round;}
+  .line-dash{stroke:var(--line-white);fill:none;stroke-width:2.5;stroke-dasharray:9 7;stroke-linecap:round;}
+  .goal-frame{stroke:var(--line-white);stroke-width:4;fill:none;}
+
+  .drawing-item{cursor:default;}
+  .drawing-item .shaft{fill:none;stroke-linecap:round;stroke-linejoin:round;}
+  .drawing-item .head{stroke:none;}
+  #court-wrap.erasing .drawing-item{cursor:pointer;}
+  #court-wrap.erasing .drawing-item:hover .shaft{opacity:.5;}
+
+  /* ---------- Players ---------- */
+  .piece{
+    position:absolute;
+    width:6.2%;
+    aspect-ratio:1/1;
+    transform:translate(-50%,-50%);
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    font-size:1rem;
+    color:#fff;
+    user-select:none;
+    touch-action:none;
+    box-shadow:0 3px 6px rgba(0,0,0,.45), inset 0 -3px 6px rgba(0,0,0,.25), inset 0 2px 3px rgba(255,255,255,.35);
+    border:2px solid rgba(0,0,0,.35);
+  }
+  .piece.team-a{background:radial-gradient(circle at 35% 30%, #e0554a, var(--team-a) 60%, var(--team-a-dark));}
+  .piece.team-b{background:radial-gradient(circle at 35% 30%, #f3d768, var(--team-b) 60%, var(--team-b-dark));}
+  .piece.gk{border-style:dashed;border-width:3px;border-color:var(--ring);}
+  .piece.selected{box-shadow:0 0 0 4px var(--ring), 0 3px 6px rgba(0,0,0,.45);}
+  .piece:active{cursor:grabbing;}
+
+  .ball{
+    position:absolute;
+    width:3.4%;
+    aspect-ratio:1/1;
+    transform:translate(-50%,-50%);
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #4a4a4a, #1a1a1a 55%, #000);
+    box-shadow:0 3px 6px rgba(0,0,0,.5), inset 0 -2px 4px rgba(0,0,0,.3);
+    touch-action:none;
+    border:2px solid #000;
+  }
+  .ball.selected{box-shadow:0 0 0 4px var(--ring);}
+
+  /* ---------- Sidebar / Clipboard ---------- */
+  #sidebar{
+    flex:0 0 250px;
+    max-width:250px;
+    background:var(--paper);
+    background-image:linear-gradient(rgba(0,0,0,.03) 1px, transparent 1px);
+    background-size:100% 26px;
+    border-radius:4px;
+    box-shadow:0 12px 26px rgba(0,0,0,.4);
+    padding:20px 16px 16px;
+    position:relative;
+  }
+  #sidebar::before{
+    content:"";
+    position:absolute;
+    top:-16px;left:50%;
+    transform:translateX(-50%);
+    width:70px;height:26px;
+    background:linear-gradient(180deg,#bfbfbf,#8f8f8f);
+    border-radius:6px;
+    box-shadow:0 3px 4px rgba(0,0,0,.4), inset 0 1px 1px rgba(255,255,255,.5);
+  }
+  #sidebar::after{
+    content:"";
+    position:absolute;
+    top:-9px;left:50%;
+    transform:translateX(-50%);
+    width:26px;height:12px;
+    background:#6b6b6b;
+    border-radius:50%;
+    box-shadow:0 1px 2px rgba(0,0,0,.5);
+  }
+  .section{margin-bottom:16px;}
+  .section h2{
+    font-family:'Kalam',cursive;
+    font-size:1.05rem;
+    margin:0 0 8px;
+    color:#5a3c1e;
+    border-bottom:2px solid var(--paper-dark);
+    padding-bottom:4px;
+  }
+  .btnrow{display:flex;flex-wrap:wrap;gap:6px;}
+  button{
+    font-family:'Oswald',sans-serif;
+    font-size:.78rem;
+    letter-spacing:.02em;
+    text-transform:uppercase;
+    border:1px solid #00000022;
+    background:#fff;
+    color:var(--ink);
+    padding:7px 9px;
+    border-radius:5px;
+    cursor:pointer;
+    box-shadow:0 2px 0 rgba(0,0,0,.15);
+    transition:transform .05s ease;
+  }
+  button:hover{filter:brightness(1.06);}
+  button:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(0,0,0,.15);}
+  button.active{background:var(--accent);border-color:#a9631f;color:#3a2405;}
+  button.wide{flex:1 1 100%;}
+  button.team-btn-a{background:var(--team-a);color:#fff;}
+  button.team-btn-b{background:var(--team-b);color:#fff;}
+
+  .swatches{display:flex;gap:8px;}
+  .swatch{
+    width:24px;height:24px;border-radius:50%;
+    border:2px solid #0000002a;
+    cursor:pointer;
+  }
+  .swatch.active{outline:3px solid var(--ring);outline-offset:1px;}
+
+  .hint{
+    font-size:.74rem;
+    line-height:1.4;
+    color:#6b5636;
+    font-family:'Kalam',cursive;
+  }
+
+  @media (max-width: 760px){
+    #sidebar{flex:1 1 100%;max-width:100%;order:2;}
+    #court-outer{order:1;}
+  }
+
+  @media (orientation: landscape){
+    #court-wrap{max-width:850px;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+
+  <main>
+    <div id="court-outer">
+      <div id="court-wrap">
+        <svg id="court-svg" viewBox="0 0 500 400" preserveAspectRatio="none">
+          <g transform="translate(500,0) rotate(90)">
+          <rect class="court-fill" x="0" y="0" width="1000" height="500"></rect>
+
+          <!-- Torraum-Tönung (Viertelkreis - Gerade - Viertelkreis, um die Torpfosten) -->
+          <path class="goal-tint-a" d="M0,62.5 A150,150 0 0,1 150,212.5 L150,287.5 A150,150 0 0,1 0,437.5 Z"></path>
+          <path class="goal-tint-b" d="M1000,62.5 A150,150 0 0,0 850,212.5 L850,287.5 A150,150 0 0,0 1000,437.5 Z"></path>
+
+          <!-- Spielfeldrand -->
+          <rect class="line" x="2" y="2" width="996" height="496" stroke-width="4"></rect>
+          <!-- Mittellinie -->
+          <line class="line" x1="500" y1="2" x2="500" y2="498"></line>
+
+          <!-- 6m Torraumlinien -->
+          <path class="line" d="M0,62.5 A150,150 0 0,1 150,212.5 L150,287.5 A150,150 0 0,1 0,437.5"></path>
+          <path class="line" d="M1000,62.5 A150,150 0 0,0 850,212.5 L850,287.5 A150,150 0 0,0 1000,437.5"></path>
+
+          <!-- 9m Freiwurflinien (konzentrisch, 3m außerhalb der 6m-Linie) -->
+          <path class="line-dash" d="M74,0 A225,225 0 0,1 225,212.5 L225,287.5 A225,225 0 0,1 74,500"></path>
+          <path class="line-dash" d="M926,0 A225,225 0 0,0 775,212.5 L775,287.5 A225,225 0 0,0 926,500"></path>
+
+          <!-- 7m Linien -->
+          <line class="line" x1="175" y1="238" x2="175" y2="262"></line>
+          <line class="line" x1="825" y1="238" x2="825" y2="262"></line>
+
+          <!-- 4m Torwartlinien -->
+          <line class="line-dash" x1="100" y1="244" x2="100" y2="256"></line>
+          <line class="line-dash" x1="900" y1="244" x2="900" y2="256"></line>
+
+          <!-- Tore -->
+          <rect class="goal-frame" x="-18" y="212.5" width="18" height="75"></rect>
+          <rect class="goal-frame" x="1000" y="212.5" width="18" height="75"></rect>
+          </g>
+
+          <g id="drawings"></g>
+        </svg>
+        <div id="players-layer"></div>
+      </div>
+    </div>
+
+    <aside id="sidebar">
+      <div class="section">
+        <h2>Werkzeug</h2>
+        <div class="btnrow">
+          <button data-tool="select" class="active">↕ Verschieben</button>
+          <button data-tool="pen">✏ Stift</button>
+          <button data-tool="arrow">➤ Pfeil</button>
+          <button data-tool="erase">✕ Radierer</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Ansicht</h2>
+        <div class="btnrow">
+          <button class="wide" id="fullscreen-btn">⛶ Vollbild</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="hint">Tipp: Spieler antippen wählt sie aus (Entf-Taste löscht). Mit Stift oder Pfeil Laufwege und Anspiele einzeichnen.</p>
+      </div>
+    </aside>
+  </main>
+
+</div>
+
+<script>
+(function(){
+  const NS = "http://www.w3.org/2000/svg";
+  const playersLayer = document.getElementById('players-layer');
+  const courtWrap = document.getElementById('court-wrap');
+  const svg = document.getElementById('court-svg');
+  const drawings = document.getElementById('drawings');
+
+  let tool = 'select';
+  let drawColor = '#2b2118';
+  let selected = null;
+  let counters = {a:8, b:8};
+
+  const roleNames = { gk:'Torwart', lw:'Linksaußen', lb:'Rückraum Links', cb:'Rückraum Mitte',
+                       rb:'Rückraum Rechts', rw:'Rechtsaußen', pv:'Kreisläufer' };
+
+  function defaultPlayers(){
+    return [
+      {id:'a2', team:'a', num:1, role:'lw', x:50,  y:30},
+      {id:'a3', team:'a', num:2, role:'lb', x:320, y:80},
+      {id:'a4', team:'a', num:3, role:'cb', x:340, y:250},
+      {id:'a5', team:'a', num:4, role:'rb', x:320, y:420},
+      {id:'a6', team:'a', num:5, role:'rw', x:50,  y:470},
+      {id:'a7', team:'a', num:6, role:'pv', x:170, y:250},
+
+      {id:'b2', team:'b', num:1, role:'',   x:145, y:110},
+      {id:'b3', team:'b', num:2, role:'',   x:175, y:165},
+      {id:'b4', team:'b', num:3, role:'',   x:195, y:215},
+      {id:'b5', team:'b', num:4, role:'',   x:195, y:285},
+      {id:'b6', team:'b', num:5, role:'',   x:175, y:335},
+      {id:'b7', team:'b', num:6, role:'',   x:145, y:390},
+    ];
+  }
+
+  let idSeq = 0;
+  function makePiece(p){
+    const el = document.createElement('div');
+    el.className = 'piece team-' + p.team + (p.role === 'gk' ? ' gk' : '');
+    el.textContent = p.num;
+    el.style.left = (100 - p.y/5) + '%';
+    el.style.top = (p.x/4) + '%';
+    el.title = p.role ? roleNames[p.role] : ('Team ' + (p.team==='a'?'Rot':'Gelb'));
+    el.dataset.id = p.id;
+    playersLayer.appendChild(el);
+    attachDrag(el);
+    return el;
+  }
+
+  function buildInitial(){
+    playersLayer.querySelectorAll('.piece').forEach(e=>e.remove());
+    defaultPlayers().forEach(makePiece);
+    resetBall();
+    counters = {a:8, b:8};
+  }
+
+  // ---------- Ball ----------
+  let ball;
+  function resetBall(){
+    if(ball) ball.remove();
+    ball = document.createElement('div');
+    ball.className = 'ball';
+    ball.style.left = '50%';
+    ball.style.top = '50%';
+    playersLayer.appendChild(ball);
+    attachDrag(ball);
+  }
+
+  // ---------- Dragging ----------
+  function attachDrag(el){
+    el.addEventListener('pointerdown', (e)=>{
+      if(tool !== 'select') return;
+      e.preventDefault();
+      el.setPointerCapture(e.pointerId);
+      selectPiece(el);
+      const move = (ev)=>{
+        const rect = playersLayer.getBoundingClientRect();
+        let px = ((ev.clientX - rect.left) / rect.width) * 100;
+        let py = ((ev.clientY - rect.top) / rect.height) * 100;
+        px = Math.max(0, Math.min(100, px));
+        py = Math.max(0, Math.min(100, py));
+        el.style.left = px + '%';
+        el.style.top = py + '%';
+      };
+      const up = (ev)=>{
+        el.releasePointerCapture(e.pointerId);
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
+  }
+
+  function selectPiece(el){
+    if(selected) selected.classList.remove('selected');
+    selected = el;
+    el.classList.add('selected');
+  }
+  courtWrap.addEventListener('pointerdown', (e)=>{
+    if(tool === 'select' && e.target === courtWrap || e.target === svg){
+      if(selected){selected.classList.remove('selected'); selected=null;}
+    }
+  });
+
+  document.addEventListener('keydown', (e)=>{
+    if((e.key === 'Delete' || e.key === 'Backspace') && selected && selected.classList.contains('piece')){
+      selected.remove();
+      selected = null;
+    }
+  });
+
+  // ---------- Tools ----------
+  document.querySelectorAll('[data-tool]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('[data-tool]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      tool = btn.dataset.tool;
+      playersLayer.classList.toggle('locked', tool !== 'select');
+      courtWrap.classList.toggle('drawing', tool === 'pen' || tool === 'arrow');
+      courtWrap.classList.toggle('erasing', tool === 'erase');
+    });
+  });
+
+  function toSvgPoint(ev){
+    const rect = svg.getBoundingClientRect();
+    const x = ((ev.clientX - rect.left) / rect.width) * 500;
+    const y = ((ev.clientY - rect.top) / rect.height) * 400;
+    return {x,y};
+  }
+
+  // Freehand pen
+  let currentPath = null, pathD = '';
+  svg.addEventListener('pointerdown', (e)=>{
+    if(tool === 'pen'){
+      const p = toSvgPoint(e);
+      currentPath = document.createElementNS(NS, 'path');
+      currentPath.classList.add('drawing-item');
+      currentPath.setAttribute('fill','none');
+      currentPath.setAttribute('stroke', drawColor);
+      currentPath.setAttribute('stroke-width','4');
+      currentPath.setAttribute('stroke-linecap','round');
+      currentPath.setAttribute('stroke-linejoin','round');
+      pathD = 'M'+p.x.toFixed(1)+','+p.y.toFixed(1);
+      currentPath.setAttribute('d', pathD);
+      drawings.appendChild(currentPath);
+      svg.setPointerCapture(e.pointerId);
+    } else if(tool === 'arrow'){
+      const p = toSvgPoint(e);
+      arrowStart = p;
+      arrowGroup = document.createElementNS(NS,'g');
+      arrowGroup.classList.add('drawing-item');
+      arrowShaft = document.createElementNS(NS,'line');
+      arrowShaft.classList.add('shaft');
+      arrowShaft.setAttribute('stroke', drawColor);
+      arrowShaft.setAttribute('stroke-width','4');
+      arrowShaft.setAttribute('x1', p.x); arrowShaft.setAttribute('y1', p.y);
+      arrowShaft.setAttribute('x2', p.x); arrowShaft.setAttribute('y2', p.y);
+      arrowHead = document.createElementNS(NS,'polygon');
+      arrowHead.classList.add('head');
+      arrowHead.setAttribute('fill', drawColor);
+      arrowGroup.appendChild(arrowShaft);
+      arrowGroup.appendChild(arrowHead);
+      drawings.appendChild(arrowGroup);
+      svg.setPointerCapture(e.pointerId);
+    } else if(tool === 'erase'){
+      const target = e.target.closest('.drawing-item');
+      if(target) target.remove();
+    }
+  });
+
+  svg.addEventListener('pointermove', (e)=>{
+    if(tool === 'pen' && currentPath){
+      const p = toSvgPoint(e);
+      pathD += ' L'+p.x.toFixed(1)+','+p.y.toFixed(1);
+      currentPath.setAttribute('d', pathD);
+    } else if(tool === 'arrow' && arrowGroup){
+      const p = toSvgPoint(e);
+      arrowShaft.setAttribute('x2', p.x);
+      arrowShaft.setAttribute('y2', p.y);
+      updateArrowHead(arrowStart, p);
+    }
+  });
+
+  let arrowStart=null, arrowGroup=null, arrowShaft=null, arrowHead=null;
+  function updateArrowHead(start, end){
+    const angle = Math.atan2(end.y-start.y, end.x-start.x);
+    const size = 14;
+    const backAngle = 0.45;
+    const p1 = end;
+    const p2 = {x: end.x - size*Math.cos(angle-backAngle), y: end.y - size*Math.sin(angle-backAngle)};
+    const p3 = {x: end.x - size*Math.cos(angle+backAngle), y: end.y - size*Math.sin(angle+backAngle)};
+    arrowHead.setAttribute('points', `${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`);
+  }
+
+  svg.addEventListener('pointerup', (e)=>{
+    if(tool === 'pen' && currentPath){
+      currentPath = null;
+    } else if(tool === 'arrow' && arrowGroup){
+      arrowGroup = null;
+    }
+  });
+
+  // ---------- Vollbild ----------
+  const fsBtn = document.getElementById('fullscreen-btn');
+  const appEl = document.querySelector('.app');
+  fsBtn.addEventListener('click', ()=>{
+    if(!document.fullscreenElement){
+      appEl.requestFullscreen().catch(()=>{});
+    } else {
+      document.exitFullscreen();
+    }
+  });
+  document.addEventListener('fullscreenchange', ()=>{
+    fsBtn.textContent = document.fullscreenElement ? '⛶ Vollbild verlassen' : '⛶ Vollbild';
+  });
+
+  buildInitial();
+})();
+</script>
+</body>
+</html>
